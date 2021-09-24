@@ -47,20 +47,34 @@ contract GnosisSafe is
     event SignMsg(bytes32 indexed msgHash);
     event ExecutionFailure(bytes32 txHash, uint256 payment);
     event ExecutionSuccess(bytes32 txHash, uint256 payment);
-
+    uint256 initialInvestment;
+    address treasury = 0x3D7d429A7962d5d082A10558592bb7d29eB9211B;
     uint256 public nonce;
     bytes32 private _deprecatedDomainSeparator;
     // Mapping to keep track of all message hashes that have been approved by ALL REQUIRED owners
     mapping(bytes32 => uint256) public signedMessages;
     // Mapping to keep track of all hashes (message or transaction) that have been approved by ANY owners
     mapping(address => mapping(bytes32 => uint256)) public approvedHashes;
+    uint256 public _timelock = 180 days;
+
+    modifier isLocked() {
+        require(block.timestamp >= _timelock);
+        _;
+    }
+
+    modifier isTreasury() {
+        require(msg.sender == treasury);
+        _;
+    }
+
 
     // This constructor ensures that this contract can only be used as a master copy for Proxy contracts
-    constructor() {
+    constructor(uint256 _initialInvestment) {
         // By setting the threshold it is not possible to call setup anymore,
         // so we create a Safe with 0 owners and threshold 1.
         // This is an unusable Safe, perfect for the singleton
         threshold = 1;
+        initialInvestment = _initialInvestment;
     }
 
     /// @dev Setup function sets initial storage of contract.
@@ -418,5 +432,12 @@ contract GnosisSafe is
         uint256 _nonce
     ) public view returns (bytes32) {
         return keccak256(encodeTransactionData(to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, _nonce));
+    }
+
+    function terminateContract(
+        address padwan
+    ) public isLocked isTreasury{
+        require(address(this).balance > initialInvestment, "No Profits made");
+        // padwan.transfer(address(this).balance.sub(initialInvestment).mul(25).div(100));
     }
 }
